@@ -1,0 +1,95 @@
+{
+  // ========= General editor behaviour =========
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "ms-python.black-formatter",
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.rulers": [
+    88
+  ],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true,
+    "**/.mypy_cache": true,
+    "**/.ruff_cache": true,
+    ".venv": true,
+    ".vscode/.ropeproject": true
+  },
+  "files.watcherExclude": {
+    "**/dist/**": true,
+    "**/build/**": true,
+    "**/.git/**": true,
+    "**/.ruff_cache/**": true
+  },
+  // ========= Python / Pylance / Ruff / Black =========
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticMode": "workspace",
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  // Use Black as the formatter for Python
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      // Use Ruff to organize imports on save
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  // Ruff extension
+  "ruff.nativeServer": "on",
+  "ruff.importStrategy": "fromEnvironment",
+  "ruff.lineLength": 88,
+  "ruff.configurationPreference": "filesystemFirst",
+  // ========= Jupyter =========
+  "jupyter.askForKernelRestart": false,
+  "jupyter.notebookFileRoot": "${workspaceFolder}",
+  "jupyter.interactiveWindow.mode": "perFile",
+  "jupyter.logging.level": "error",
+  // ========= Docker / Container Tools =========
+  "docker.showAutoComposeFileWarning": false,
+  "docker.containers.showAdvanced": true,
+  "docker.images.showDanglingImages": false,
+  "docker.explorerRefreshInterval": 2000,
+  // ========= Kubernetes =========
+  "vs-kubernetes": {
+    "vs-kubernetes.crd-code-completion": "enabled",
+    "vs-kubernetes.show-namespace": true
+  },
+  // ========= Terraform (HashiCorp) =========
+  "terraform.languageServer": {
+    "enable": true,
+    "args": []
+  },
+  "terraform.indexing": {
+    "enabled": true,
+    "liveIndexing": true
+  },
+  // ========= YAML (for K8s, GitHub Actions, docker-compose) =========
+  "yaml.format.enable": true,
+  "yaml.validate": true,
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.{yml,yaml}",
+    "https://json.schemastore.org/kubernetes.json": "k8s/**/*.{yml,yaml}",
+    "https://json.schemastore.org/docker-compose.json": "docker-compose*.{yml,yaml}"
+  },
+  // ========= AWS Toolkit =========
+  "aws.telemetry": false,
+  "aws.excludeRegions": [
+    "ap-south-1",
+    "sa-east-1"
+  ],
+  "aws.s3.showWelcome": false,
+  // ========= Azure Resources =========
+  "azure.resourceCacheTtl": 300,
+  // ========= GitHub Actions =========
+  "github-actions.workflows.pinned.workflows": [],
+  "github-actions.workflows.scan.enabled": true,
+  "[jsonc]": {
+    "editor.defaultFormatter": "vscode.json-language-features"
+  }
+}
