@@ -26,4 +26,4 @@ This project replicates the real-time data infrastructure used by agricultural c
 [Screenshots of data/dashboards - adding these once built]
 
 ## Lessons Learned
-[Documenting challenges and solutions - updated weekly in LEARNINGS.MD]
+[Documenting challenges and solutions - updated weekly in LEARNINGS.md]
