@@ -1,17 +1,37 @@
-# Python env
+# Python
 .venv/
 venv/
 env/
-
-# Python junk
 __pycache__/
 *.py[cod]
+*.pyc
 *.pyo
 *.pyd
 *.pytest_cache/
+.Python
+*.egg-info/
+dist/
+build/
 
-# VS Code
-.vscode/
+# Environment
+.env
+.env.local
 
 # Jupyter
 .ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data
+data/raw/*.csv
+data/raw/*.parquet
+data/processed/*.parquet
+
+# VS Code
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+desktop.ini
