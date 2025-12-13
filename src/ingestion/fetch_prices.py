@@ -6,7 +6,6 @@ import os
 from datetime import datetime, timedelta
 from io import StringIO
 from pathlib import Path
-from urllib import response
 
 import polars as pl
 import requests
@@ -18,9 +17,7 @@ load_dotenv()
 def fetch_corn_prices(
     interval: str = "monthly",
     years_back: int = 5,
-    save_path: Path = Path(
-        "C:\\Users\\samb2\\Documents\\GitHub\\ag-data-engineering-dashboard\\data\\raw"
-    ),
+    save_path: Path = Path(__file__).parent.parent.parent / "data" / "raw",
 ) -> pl.DataFrame:
     """
     Fetch corn price data from Alpha Vantage API.
