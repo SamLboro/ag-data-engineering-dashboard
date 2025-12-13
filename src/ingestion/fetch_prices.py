@@ -18,7 +18,9 @@ load_dotenv()
 def fetch_corn_prices(
     interval: str = "monthly",
     years_back: int = 5,
-    save_path: Path = Path("../data/raw/"),
+    save_path: Path = Path(
+        "C:\\Users\\samb2\\Documents\\GitHub\\ag-data-engineering-dashboard\\data\\raw"
+    ),
 ) -> pl.DataFrame:
     """
     Fetch corn price data from Alpha Vantage API.
@@ -78,17 +80,17 @@ def fetch_corn_prices(
         # Sort by date
         df_filtered = df_filtered.sort("date")
 
-        # # Save outputs
-        # save_path.mkdir(parents=True, exist_ok=True)
+        # Save outputs
+        save_path.mkdir(parents=True, exist_ok=True)
 
-        # csv_path = save_path / f"corn_{interval}_{years_back}yr.csv"
-        # parquet_path = save_path / f"corn_{interval}_{years_back}yr.parquet"
+        csv_path = save_path / f"corn_{interval}_{years_back}yr.csv"
+        parquet_path = save_path / f"corn_{interval}_{years_back}yr.parquet"
 
-        # df_filtered.write_csv(csv_path)
-        # df_filtered.write_parquet(parquet_path)
+        df_filtered.write_csv(csv_path)
+        df_filtered.write_parquet(parquet_path)
 
-        # print(f"Saved CSV: {csv_path}")
-        # print(f"Saved Parquet: {parquet_path}")
+        print(f"Saved CSV: {csv_path}")
+        print(f"Saved Parquet: {parquet_path}")
 
         return df_filtered
 
