@@ -79,7 +79,7 @@ def fetch_batch_safe(
 
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, headers=headers, timeout=120)
+            response = requests.get(url, headers=headers, timeout=300)
 
             if response.status_code == 503:
                 wait_time = 2**attempt
@@ -175,7 +175,7 @@ def fetch_concurrent_sliding_window(
         while active_futures:
             # Wait for at least one future to complete
             done, pending = wait(
-                active_futures.keys(), return_when=FIRST_COMPLETED, timeout=120
+                active_futures.keys(), return_when=FIRST_COMPLETED, timeout=300
             )
 
             if not done:
