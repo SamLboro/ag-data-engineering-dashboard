@@ -16,10 +16,10 @@ Typical usage:
     python src/ingestion/fetch_weather_bulk.py --clean-only
 """
 
-import argparse
 import json
 import os
 import time
+from calendar import c
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import datetime
 from optparse import Option
@@ -29,8 +29,10 @@ from tracemalloc import start
 from typing import Any, Dict, List, Optional, Tuple
 from wsgiref import headers
 
+import click
 import polars as pl
 import requests
+from bleach import clean
 from dotenv import load_dotenv
 from matplotlib.pylab import f
 
@@ -602,20 +604,70 @@ def clean_weather_data(df: pl.DataFrame) -> pl.DataFrame:
 
 
 # CLI
-def main() -> None:
+@click.command(
+    help="Fetch Iowa weather data from NOAA Climate Data Online",
+)
+@click.option(
+    "--year",
+    type=int,
+    default=None,
+    help="Fetch specific year only (e.g., 2020)",
+)
+@click.option(
+    "--start",
+    type=int,
+    default=2020,
+    show_default=True,
+    help="Start year for range",
+)
+@click.option(
+    "--end",
+    type=int,
+    default=2024,
+    show_default=True,
+    help="End year for range",
+)
+@click.option(
+    "--workers",
+    type=int,
+    default=4,
+    show_default=True,
+    help="Number of concurrent workers",
+)
+@click.option(
+    "--data-dir",
+    type=str,
+    default="C:\\Users\\samb2\\Documents\\GitHub\\ag-data-engineering-dashboard\\data\\raw",
+    show_default=True,
+    help="Output directory",
+)
+@click.option(
+    "--clean-only",
+    is_flag=True,
+    default=False,
+    help="Only clean existing raw data, skip fetch",
+)
+def main(
+    year: Optional[int],
+    start: int,
+    end: int,
+    workers: int,
+    data_dir: str,
+    clean_only: bool,
+) -> None:
     """
-    Main entry point for command-line interface.
+    Main entry point for command-line interface using Click.
 
     Parses command-line arguments and executes appropriate fetch or clean operations.
     Provides multiple modes: fetch all years, fetch specific year, or clean existing data.
 
-    Command-line Arguments:
-        --year: Fetch specific year only (int)
-        --start: Start year for range (int, default: 2020)
-        --end: End year for range (int, default: 2024)
-        --workers: Number of concurrent workers (int, default: 4)
-        --data-dir: Output directory (str, default: 'data/raw')
-        --clean-only: Only clean existing raw data, skip fetch (flag)
+    Args:
+        year: Fetch specific year only. If provided, overrides start/end.
+        start: Start year for range (default: 2020).
+        end: End year for range (default: 2024).
+        workers: Number of concurrent HTTP requests (default: 4).
+        data_dir: Output directory for files (default: 'data/raw').
+        clean_only: If True, only clean existing data without fetching.
 
     Returns:
         None
@@ -630,4 +682,78 @@ def main() -> None:
 
         # Fetch specific year
         $ python fetch_weather_bulk.py --year 2020
+
+        # Fetch with more workers
+        $ python fetch_weather_bulk.py --workers 6
+
+        # Clean existing data
+        $ python fetch_weather_bulk.py --clean-only
     """
+    # Validate NOAA token
+    if not clean_only:
+        NOAA_TOKEN = os.getenv("NOAA_TOKEN")
+        if not NOAA_TOKEN:
+            click.echo("Error: NOAA_TOKEN environment variable not found.")
+            raise click.Abort()
+
+    try:
+        if clean_only:
+            # Clean existing raw data files
+            click.echo("Cleaning existing raw data files...")
+            data_path = Path(data_dir)
+
+            raw_files = list(data_path.glob("iowa_weather_*_raw.parquet"))
+
+            if not raw_files:
+                click.echo("No raw data files found to clean.")
+                return
+
+            for raw_file in raw_files:
+                df_raw = pl.read_parquet(raw_file)
+                df_clean = clean_weather_data(df_raw)
+
+                clean_file = (
+                    raw_file.parent.parent
+                    / "processed"
+                    / raw_file.name.replace("_raw", "_clean")
+                )
+                clean_file.parent.mkdir(parents=True, exist_ok=True)
+                df_clean.write_parquet(clean_file)
+
+                click.echo(f"Cleaned data saved to {clean_file}")
+        elif year:
+            # Fetch specific year
+            df = fetch_year_with_checkpoint(
+                year=year,
+                data_dir=data_dir,
+                max_workers=workers,
+            )
+
+            if df is not None:
+                click.echo("Fetch completed successfully.")
+        else:
+            # Fetch range of years
+            df = fetch_all_years(
+                start_year=start,
+                end_year=end,
+                data_dir=data_dir,
+                max_workers=workers,
+            )
+
+            if df is not None:
+                click.echo("Bulk fetch completed successfully.")
+
+    except KeyboardInterrupt:
+        click.echo("\n\nProcess interrupted by user.")
+        click.echo("Progress saved, Re-run to continue.")
+    except click.Abort:
+        pass
+    except Exception as e:
+        click.echo(f"Error: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()
