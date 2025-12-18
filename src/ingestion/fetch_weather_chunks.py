@@ -438,3 +438,196 @@ def fetch_year_with_checkpoint(
     except Exception as e:
         print(f"\nError fetching {year}: {e}")
         return None
+
+
+def fetch_all_years(
+    start_year: int = 2020,
+    end_year: int = 2024,
+    data_dir: str = "C:\\Users\\samb2\\Documents\\GitHub\\ag-data-engineering-dashboard\\data\\raw",
+    max_workers: int = 4,
+) -> Optional[pl.DataFrame]:
+    """
+    Fetch multiple consecutive years of Iowa weather data.
+
+    Fetches weather data for a range of years sequentially, with automatic
+    combining into a single dataset. Supports interruption and resumption,
+    with individual year files preserved.
+
+    Args:
+        start_year: First year to fetch (inclusive). Defaults to 2020.
+        end_year: Last year to fetch (inclusive). Defaults to 2024.
+        data_dir: Directory to save Parquet files. Defaults to 'data/raw'.
+        max_workers: Number of concurrent HTTP requests per year. Defaults to 4.
+
+    Returns:
+        Combined Polars DataFrame containing all years of weather data.
+        Returns None if no data successfully fetched.
+
+    Raises:
+        KeyboardInterrupt: If user interrupts during fetch. Progress is saved.
+    """
+    print(f"\n{'='*60}")
+    print(f"BULK WEATHER FETCH: {start_year}-{end_year}")
+    print(f"{'='*60}")
+
+    all_dataframes: List[pl.DataFrame] = []
+    overall_start = time.monotonic()
+
+    for year in range(start_year, end_year + 1):
+        try:
+            df_year = fetch_year_with_checkpoint(
+                year=year, data_dir=data_dir, max_workers=max_workers
+            )
+
+            if df_year is not None:
+                all_dataframes.append(df_year)
+                print(f"Year {year} fetched successfully.")
+            else:
+                print(f"Year {year} fetch failed.")
+
+            # Pause between years
+            if year < end_year:
+                time.sleep(10)
+
+        except KeyboardInterrupt:
+            print(f"\n\n⏸️  Interrupted during {year}")
+            print(
+                f"Years completed: {[start_year + i for i in range(len(all_dataframes))]}"
+            )
+            break
+
+        except Exception as e:
+            print(f"Unexpected error during {year}: {e}")
+            print(f"Continuing to next year...")
+            continue
+
+    overall_elapsed = time.monotonic() - overall_start
+
+    # combine all years
+    if all_dataframes:
+        print("Combining all years")
+
+        df_combined = pl.concat(all_dataframes)
+
+        combined_path = (
+            Path(data_dir) / f"iowa_weather_{start_year}_{end_year}_raw.parquet"
+        )
+        df_combined.write_parquet(combined_path)
+
+        print(f"\nBULK FETCH COMPLETE")
+        print(f"{'='*60}")
+        print(
+            f"Total time: {overall_elapsed/60:.1f} minutes ({overall_elapsed/3600:.1f} hours)"
+        )
+        print(f"Total records: {len(df_combined):,}")
+        print(f"Years fetched: {len(all_dataframes)}")
+        print(f"{'='*60}")
+
+        return df_combined
+    else:
+        print("No data to combine")
+        return None
+
+
+# Data cleaning
+def clean_weather_data(df: pl.DataFrame) -> pl.DataFrame:
+    """
+    Transform raw NOAA weather data from long to wide format.
+
+    Converts long-format data (one row per station per datatype per day) to
+    wide format (one row per day with columns for each datatype). Aggregates
+    across all weather stations by taking daily means.
+
+    Args:
+        df: Raw weather DataFrame with columns:
+            - date (str): ISO datetime string
+            - datatype (str): 'TMAX', 'TMIN', or 'PRCP'
+            - station (str): Station ID
+            - value (float): Measured value
+
+    Returns:
+        Cleaned Polars DataFrame with columns:
+            - date (date): Date object
+            - temp_max_f (float): Average daily maximum temperature (°F)
+            - temp_min_f (float): Average daily minimum temperature (°F)
+            - precip_in (float): Average daily precipitation (inches), nulls filled with 0
+        One row per unique date.
+
+    Notes:
+        - Aggregates multiple stations by taking mean per day/datatype
+        - Missing precipitation values filled with 0.0 (no rain)
+        - Temperature nulls preserved (may indicate data quality issues)
+        - Typical reduction: ~230k raw records → ~365 daily records per year
+    """
+    print("\n" + "=" * 60)
+    print("CLEANING WEATHER DATA")
+    print("=" * 60)
+
+    # Parse dates
+    df = df.with_columns(
+        [pl.col("date").str.strptime(pl.Date, "%Y-%m-%dT%H:%M:%S").alias("date")]
+    )
+
+    print(f"Date range: {df['date'].min()} to {df['date'].max()}")
+
+    # Aggregate across stations (average across date and datatype)
+    df_agg = df.group_by(["date", "datatype"]).agg(
+        [
+            pl.col("value").mean().alias("value"),
+            pl.col("station").count().alias("num_stations"),
+        ]
+    )
+
+    # Pivot to wide format
+    df_wide = df_agg.pivot(values="value", index="date", on="datatype")
+
+    # Rename columns
+    rename_map = {}
+    if "TMAX" in df_wide.columns:
+        rename_map["TMAX"] = "temp_max_f"
+    if "TMIN" in df_wide.columns:
+        rename_map["TMIN"] = "temp_min_f"
+    if "PRCP" in df_wide.columns:
+        rename_map["PRCP"] = "precip_in"
+
+    df_clean = df_wide.rename(rename_map)
+
+    # Sort by date
+    df_clean = df_clean.sort("date")
+
+    # Handle nulls
+    df_clean = df_clean.with_columns([pl.col("precip_in").fill_null(0.0)])
+
+    return df_clean
+
+
+# CLI
+def main() -> None:
+    """
+    Main entry point for command-line interface.
+
+    Parses command-line arguments and executes appropriate fetch or clean operations.
+    Provides multiple modes: fetch all years, fetch specific year, or clean existing data.
+
+    Command-line Arguments:
+        --year: Fetch specific year only (int)
+        --start: Start year for range (int, default: 2020)
+        --end: End year for range (int, default: 2024)
+        --workers: Number of concurrent workers (int, default: 4)
+        --data-dir: Output directory (str, default: 'data/raw')
+        --clean-only: Only clean existing raw data, skip fetch (flag)
+
+    Returns:
+        None
+
+    Exits:
+        0: Success
+        1: Error (missing token, no files found, etc.)
+
+    Examples:
+        # Fetch all years
+        $ python fetch_weather_bulk.py
+
+        # Fetch specific year
+        $ python fetch_weather_bulk.py --year 2020
+    """
